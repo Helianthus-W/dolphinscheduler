@@ -142,6 +142,11 @@ security:
           callbackUrl: "http://127.0.0.1:5173/login"
           iconUri: ""
           provider: gitee
+    trusted:
+      # 可信网关登录（POST /login/trusted）：仅在网关注入 X-Trusted-Client 头的部署中开启，
+      # 生产环境 secret 通过部署配置注入，不要提交真实密钥
+      enable: true
+      shared-secret: "ds-dev-trusted-secret"
 
 casdoor:
   # Your Casdoor server url

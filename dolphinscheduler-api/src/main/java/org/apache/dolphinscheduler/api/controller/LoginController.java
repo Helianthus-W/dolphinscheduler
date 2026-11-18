@@ -40,6 +40,8 @@ import org.apache.dolphinscheduler.dao.entity.User;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -57,6 +59,8 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -139,6 +143,70 @@ public class LoginController extends BaseController {
         }
 
         return result;
+    }
+
+    @Autowired
+    @Qualifier("trustedAuthenticator")
+    private Authenticator trustedAuthenticator;
+
+    @Value("${security.authentication.trusted.enable:false}")
+    private boolean trustedLoginEnable;
+
+    @Value("${security.authentication.trusted.shared-secret:}")
+    private String trustedSharedSecret;
+
+    /**
+     * trusted gateway login: issues a session for the given user name when the
+     * request carries the configured trusted-client header. The endpoint must
+     * only be reachable from the gateway / reverse proxy, which is responsible
+     * for injecting (and stripping client-supplied) trusted headers.
+     *
+     * @param userName user name
+     * @param request request
+     * @param response response
+     * @return login result
+     */
+    @Operation(summary = "trusted login", description = "TRUSTED_LOGIN_NOTES")
+    @PostMapping(value = "/login/trusted")
+    @ApiException(USER_LOGIN_FAILURE)
+    public Result loginByTrusted(@RequestParam(value = "userName") String userName,
+                                 HttpServletRequest request,
+                                 HttpServletResponse response) {
+        if (!trustedLoginEnable || StringUtils.isBlank(trustedSharedSecret)
+                || !isTrustedSource(request)) {
+            log.warn("Rejected untrusted login attempt, userName:{}.", userName);
+            return error(Status.USER_LOGIN_FAILURE.getCode(), Status.USER_LOGIN_FAILURE.getMsg());
+        }
+
+        if (StringUtils.isEmpty(userName)) {
+            return error(Status.USER_NAME_NULL.getCode(), Status.USER_NAME_NULL.getMsg());
+        }
+
+        String ip = getClientIpAddress(request);
+        if (StringUtils.isEmpty(ip)) {
+            return error(IP_IS_EMPTY.getCode(), IP_IS_EMPTY.getMsg());
+        }
+
+        Result<Map<String, String>> result = trustedAuthenticator.authenticate(userName, null, ip);
+        if (result.getCode() != Status.SUCCESS.getCode()) {
+            return result;
+        }
+
+        response.setStatus(HttpStatus.SC_OK);
+        Map<String, String> cookieMap = result.getData();
+        for (Map.Entry<String, String> cookieEntry : cookieMap.entrySet()) {
+            Cookie cookie = new Cookie(cookieEntry.getKey(), cookieEntry.getValue());
+            cookie.setHttpOnly(true);
+            response.addCookie(cookie);
+        }
+
+        return result;
+    }
+
+    private boolean isTrustedSource(HttpServletRequest request) {
+        String trustedHeader = request.getHeader("X-Trusted-Client");
+        return MessageDigest.isEqual(trustedSharedSecret.getBytes(StandardCharsets.UTF_8),
+                StringUtils.defaultString(trustedHeader).getBytes(StandardCharsets.UTF_8));
     }
 
     /**

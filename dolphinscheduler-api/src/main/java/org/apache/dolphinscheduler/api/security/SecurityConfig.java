@@ -20,6 +20,7 @@ package org.apache.dolphinscheduler.api.security;
 import org.apache.dolphinscheduler.api.security.impl.ldap.LdapAuthenticator;
 import org.apache.dolphinscheduler.api.security.impl.pwd.PasswordAuthenticator;
 import org.apache.dolphinscheduler.api.security.impl.sso.CasdoorAuthenticator;
+import org.apache.dolphinscheduler.api.security.impl.trusted.TrustedAuthenticator;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -70,9 +71,24 @@ public class SecurityConfig {
             case CASDOOR_SSO:
                 authenticator = new CasdoorAuthenticator();
                 break;
+            case TRUSTED:
+                authenticator = new TrustedAuthenticator();
+                break;
             default:
                 throw new IllegalStateException("Unexpected value: " + authenticationType);
         }
+        beanFactory.autowireBean(authenticator);
+        return authenticator;
+    }
+
+    /**
+     * Dedicated authenticator for the trusted gateway login endpoint. Always
+     * available regardless of the global {@code security.authentication.type},
+     * used only by {@code POST /login/trusted}.
+     */
+    @Bean(name = "trustedAuthenticator")
+    public Authenticator trustedAuthenticator() {
+        TrustedAuthenticator authenticator = new TrustedAuthenticator();
         beanFactory.autowireBean(authenticator);
         return authenticator;
     }

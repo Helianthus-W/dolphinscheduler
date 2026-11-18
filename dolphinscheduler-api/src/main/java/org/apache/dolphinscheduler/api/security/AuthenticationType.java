@@ -26,7 +26,8 @@ public enum AuthenticationType {
 
     PASSWORD(0, "verify via user name and password"),
     LDAP(1, "verify via LDAP server"),
-    CASDOOR_SSO(2, "verify via casdoor sso provider");
+    CASDOOR_SSO(2, "verify via casdoor sso provider"),
+    TRUSTED(3, "verify via trusted gateway header");
 
     AuthenticationType(int code, String desc) {
         this.code = code;
