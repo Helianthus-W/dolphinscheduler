@@ -32,6 +32,9 @@ export const useThemeStore = defineStore({
   actions: {
     setDarkTheme(): void {
       this.darkTheme = !this.darkTheme
+    },
+    setDarkThemeFlag(flag: boolean): void {
+      this.darkTheme = flag
     }
   }
 })

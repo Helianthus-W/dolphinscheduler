@@ -54,6 +54,9 @@ export function useProcessState() {
 
         processVariables.processLoadingRef = false
         return { table, chart }
+      }).catch((): StateData => {
+        processVariables.processLoadingRef = false
+        return { table: [], chart: [] }
       }),
       { table: [], chart: [] }
     )

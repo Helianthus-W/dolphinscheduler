@@ -53,6 +53,9 @@ export function useTaskState() {
         })
         taskVariables.taskLoadingRef = false
         return { table, chart }
+      }).catch((): StateData => {
+        taskVariables.taskLoadingRef = false
+        return { table: [], chart: [] }
       }),
       { table: [], chart: [] }
     )

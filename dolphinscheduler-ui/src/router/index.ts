@@ -21,6 +21,8 @@ import {
   NavigationGuardNext,
   RouteLocationNormalized
 } from 'vue-router'
+import { defineComponent, h } from 'vue'
+import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper'
 import routes from './routes'
 import { useUserStore } from '@/store/user/user'
 import type { UserInfoRes } from '@/service/modules/users/types'
@@ -29,9 +31,37 @@ import type { UserInfoRes } from '@/service/modules/users/types'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 
+// qiankun 模式下对未匹配路由给出明确提示（基座菜单直链失效/旧链接等场景），避免静默空白；
+// 独立运行保持上游行为（无 404 页）
+if (qiankunWindow.__POWERED_BY_QIANKUN__) {
+  const RouteNotFound = defineComponent({
+    name: 'RouteNotFound',
+    setup() {
+      return () =>
+        h(
+          'div',
+          {
+            style:
+              'padding:48px 24px;text-align:center;color:#888;font-size:14px'
+          },
+          '页面不存在或链接已失效，请从左侧菜单重新进入'
+        )
+    }
+  })
+  routes.push({
+    path: '/:pathMatch(.*)*',
+    name: 'qiankun-not-found',
+    component: RouteNotFound
+  })
+}
+
 const router = createRouter({
   history: createWebHistory(
-    import.meta.env.MODE === 'production' ? '/dolphinscheduler/ui/' : '/'
+    qiankunWindow.__POWERED_BY_QIANKUN__
+      ? '/dolphinscheduler'
+      : import.meta.env.MODE === 'production'
+      ? '/dolphinscheduler/ui/'
+      : '/'
   ),
   routes
 })

@@ -16,8 +16,10 @@
  */
 
 import axios, { AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios'
+import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper'
 import { useUserStore } from '@/store/user/user'
 import { useUISettingStore } from '@/store/ui-setting/ui-setting'
+import { trustedLoginState } from '@/qiankun/trustedLoginState'
 import qs from 'qs'
 import _ from 'lodash'
 import cookies from 'js-cookie'
@@ -62,12 +64,26 @@ const service = axios.create(baseRequestConfig)
 
 const err = (err: AxiosError): Promise<AxiosError> => {
   if (err.response?.status === 401 || err.response?.status === 504) {
-    userStore.setSessionId('')
-    userStore.setSecurityConfigType('')
-    userStore.setUserInfo({})
-    userStore.setBaseResDir('')
-    userStore.setBaseUdfDir('')
-    router.push({ path: '/login' })
+    const reqSessionId = (err.config as any)?.__dsReqSessionId
+    if (trustedLoginState.attempting) {
+      // Trusted login exchange in progress, the fallback redirect is handled
+      // by useTrustedLogin once the exchange settles.
+    } else if (trustedLoginState.succeeded && reqSessionId !== userStore.getSessionId) {
+      // Late 401 for the pre-exchange (empty or previous) session after a
+      // successful trusted exchange: keep the fresh session, do not redirect.
+    } else {
+      userStore.setSessionId('')
+      userStore.setSecurityConfigType('')
+      userStore.setUserInfo({})
+      userStore.setBaseResDir('')
+      userStore.setBaseUdfDir('')
+      if (trustedLoginState.enabled && trustedLoginState.succeeded && qiankunWindow.__POWERED_BY_QIANKUN__) {
+        // Unified auth: session expired, go through the host login
+        window.location.href = '/login'
+      } else {
+        router.push({ path: '/login' })
+      }
+    }
   }
 
   return Promise.reject(err)
@@ -76,6 +92,9 @@ const err = (err: AxiosError): Promise<AxiosError> => {
 service.interceptors.request.use((config: AxiosRequestConfig<any>) => {
   config.headers = config.headers || {}
   config.headers.sessionId = userStore.getSessionId
+  // Snapshot the session used by this request, so stale 401s arriving after a
+  // trusted-login session rotation can be told apart from genuine session loss
+  ;(config as any).__dsReqSessionId = userStore.getSessionId
   const language = cookies.get('language')
   if (language) config.headers.language = language
 

@@ -19,6 +19,7 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import viteCompression from 'vite-plugin-compression'
+import qiankun from 'vite-plugin-qiankun'
 import path from 'path'
 
 export default defineConfig({
@@ -26,6 +27,7 @@ export default defineConfig({
   plugins: [
     vue(),
     vueJsx(),
+    qiankun('dolphinscheduler', { useDevMode: true }),
     viteCompression({
       verbose: true,
       disable: false,
@@ -42,6 +44,11 @@ export default defineConfig({
     }
   },
   server: {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Headers': 'X-Requested-With, content-type, Authorization'
+    },
     proxy: {
       '/dolphinscheduler': {
         target: loadEnv('development', './').VITE_APP_DEV_WEB_URL,
