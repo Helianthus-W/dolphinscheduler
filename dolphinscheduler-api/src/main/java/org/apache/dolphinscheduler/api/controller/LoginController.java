@@ -96,6 +96,30 @@ public class LoginController extends BaseController {
     @Autowired
     private UsersService usersService;
 
+    @Autowired
+    private org.apache.dolphinscheduler.api.security.SecurityConfig securityConfig;
+
+    @Autowired
+    private org.apache.dolphinscheduler.api.security.ProjectMutationGuard projectMutationGuard;
+
+    /**
+     * current authentication mode + project mutation policy, exposed pre-login
+     * so the qiankun sub-app can assemble the matching auth flow (PORTAL: no
+     * exchange, 401 -> base login) and hide project-level write entries when
+     * the base owns project creation
+     */
+    @Operation(summary = "auth mode", description = "current security authentication type")
+    @GetMapping(value = "/login/auth-mode")
+    public Result authMode() {
+        Result<Map<String, Object>> result = new Result<>();
+        Map<String, Object> data = new HashMap<>();
+        data.put("type", securityConfig.getType());
+        data.put("projectCreationEnabled", projectMutationGuard.isMutationAllowed());
+        result.setData(data);
+        result.setCode(Status.SUCCESS.getCode());
+        return result;
+    }
+
     /**
      * login
      *

@@ -64,6 +64,11 @@ const service = axios.create(baseRequestConfig)
 
 const err = (err: AxiosError): Promise<AxiosError> => {
   if (err.response?.status === 401 || err.response?.status === 504) {
+    if (trustedLoginState.portalMode) {
+      // PORTAL identity source: the base session is gone, re-enter through it
+      window.location.href = '/portal'
+      return Promise.reject(err)
+    }
     const reqSessionId = (err.config as any)?.__dsReqSessionId
     if (trustedLoginState.attempting) {
       // Trusted login exchange in progress, the fallback redirect is handled
@@ -91,7 +96,9 @@ const err = (err: AxiosError): Promise<AxiosError> => {
 
 service.interceptors.request.use((config: AxiosRequestConfig<any>) => {
   config.headers = config.headers || {}
-  config.headers.sessionId = userStore.getSessionId
+  if (!trustedLoginState.portalMode) {
+    config.headers.sessionId = userStore.getSessionId
+  }
   // Snapshot the session used by this request, so stale 401s arriving after a
   // trusted-login session rotation can be told apart from genuine session loss
   ;(config as any).__dsReqSessionId = userStore.getSessionId

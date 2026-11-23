@@ -21,5 +21,8 @@
 export const trustedLoginState = {
   enabled: true,
   attempting: false,
-  succeeded: false
+  succeeded: false,
+  // PORTAL identity source: the base authenticates every request, the
+  // trusted exchange and sessionId plumbing are bypassed entirely
+  portalMode: false
 }

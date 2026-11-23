@@ -17,7 +17,7 @@
 
 spring:
   profiles:
-    active: h2
+    active: mysql
   jackson:
     time-zone: UTC
     date-format: "yyyy-MM-dd HH:mm:ss"
@@ -94,9 +94,14 @@ registry:
     digest: ~
 
 security:
+  # 项目级写操作封禁（项目一体化 P1）：false=仅服务通道（合法 X-Trusted-Client 密钥）可
+  # 创建/编辑/删除项目，浏览器直连一律 10093；true/缺省=上游行为
+  project-creation:
+    enabled: false
   authentication:
-    # Authentication types (supported types: PASSWORD,LDAP,CASDOOR_SSO)
-    type: PASSWORD
+    # Authentication types (supported types: PASSWORD,LDAP,CASDOOR_SSO,TRUSTED,PORTAL)
+    # PORTAL：身份源=基座门户，废弃 DS 自有会话认证（统一鉴权/项目一体化，见 海豚子插件/项目一体化同步方案.md §2.0）
+    type: PORTAL
     # IF you set type `LDAP`, below config will be effective
     ldap:
       # ldap server config
@@ -145,8 +150,17 @@ security:
     trusted:
       # 可信网关登录（POST /login/trusted）：仅在网关注入 X-Trusted-Client 头的部署中开启，
       # 生产环境 secret 通过部署配置注入，不要提交真实密钥
+      # PORTAL 模式下本端点不再被前端调用（服务断言直接走 X-Portal-User 头），保留作兼容回退
       enable: true
       shared-secret: "ds-dev-trusted-secret"
+    portal:
+      # PORTAL 身份源：浏览器路径经门户校验会话 cookie（dlite_login_token），短 TTL 缓存，fail-closed
+      validate-url: "http://127.0.0.1:9080/dlite-portal/oauth/token/getUser"
+      cookie-name: dlite_login_token
+      alternate-cookie-name: lvfa_token
+      cache-ttl-seconds: 30
+      connect-timeout-ms: 3000
+      read-timeout-ms: 5000
 
 casdoor:
   # Your Casdoor server url
@@ -340,5 +354,5 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/dolphinscheduler?useUnicode=true&characterEncoding=UTF-8
-    username: root
-    password: root
+    username: dlite
+    password: DLite@123456

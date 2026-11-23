@@ -18,6 +18,7 @@
 package org.apache.dolphinscheduler.api.security;
 
 import org.apache.dolphinscheduler.api.security.impl.ldap.LdapAuthenticator;
+import org.apache.dolphinscheduler.api.security.impl.portal.PortalAuthenticator;
 import org.apache.dolphinscheduler.api.security.impl.pwd.PasswordAuthenticator;
 import org.apache.dolphinscheduler.api.security.impl.sso.CasdoorAuthenticator;
 import org.apache.dolphinscheduler.api.security.impl.trusted.TrustedAuthenticator;
@@ -73,6 +74,9 @@ public class SecurityConfig {
                 break;
             case TRUSTED:
                 authenticator = new TrustedAuthenticator();
+                break;
+            case PORTAL:
+                authenticator = new PortalAuthenticator();
                 break;
             default:
                 throw new IllegalStateException("Unexpected value: " + authenticationType);

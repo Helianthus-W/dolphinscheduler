@@ -21,11 +21,13 @@ import {
   defineComponent,
   getCurrentInstance,
   onMounted,
+  ref,
   toRefs,
   watch
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTable } from './use-table'
+import { isProjectCreationEnabled } from '@/qiankun/authMode'
 import Card from '@/components/card'
 import Search from '@/components/input-search'
 import ProjectModal from './components/project-modal'
@@ -36,6 +38,11 @@ const list = defineComponent({
   setup() {
     const { t } = useI18n()
     const { variables, getTableData, createColumns } = useTable()
+    // 项目一体化：基座侧为唯一创建入口时隐藏项目级写操作入口
+    const creationEnabledRef = ref(true)
+    isProjectCreationEnabled().then((enabled) => {
+      creationEnabledRef.value = enabled
+    })
 
     const requestData = () => {
       getTableData({
@@ -99,6 +106,7 @@ const list = defineComponent({
 
     return {
       t,
+      creationEnabledRef,
       ...toRefs(variables),
       requestData,
       handleModalChange,
@@ -118,6 +126,7 @@ const list = defineComponent({
       <NSpace vertical>
         <Card>
           <NSpace justify='space-between'>
+          {this.creationEnabledRef ? (
             <NButton
               size='small'
               onClick={this.handleModalChange}
@@ -126,6 +135,9 @@ const list = defineComponent({
             >
               {t('project.list.create_project')}
             </NButton>
+          ) : (
+            <span />
+          )}
             <NSpace>
               <Search
                 v-model:value={this.searchVal}

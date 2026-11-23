@@ -19,6 +19,7 @@ import { h, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAsyncState } from '@vueuse/core'
 import ButtonLink from '@/components/button-link'
+import { isProjectCreationEnabled } from '@/qiankun/authMode'
 import { queryProjectListPaging } from '@/service/modules/projects'
 import { parseTime } from '@/common/common'
 import { deleteProject } from '@/service/modules/projects'
@@ -30,6 +31,7 @@ import {
   NIcon,
   NPopconfirm,
   NSpace,
+  NTag,
   NTooltip
 } from 'naive-ui'
 import {
@@ -42,6 +44,7 @@ import type { ProjectRes } from '@/service/modules/projects/types'
 import { ControlOutlined, DeleteOutlined, EditOutlined } from '@vicons/antd'
 import { useUserStore } from '@/store/user/user'
 import { UserInfoRes } from '@/service/modules/users/types'
+import { hostCurrentProject } from '@/qiankun/useHostProjectFollow'
 
 export function useTable() {
   const { t } = useI18n()
@@ -88,8 +91,12 @@ export function useTable() {
         key: 'name',
         className: 'project-name',
         ...COLUMN_WIDTH_CONFIG['linkName'],
-        render: (row: { code: string; name: any }) =>
-          h(
+        render: (row: { code: string; name: any }) => {
+          // 项目一体化：宿主当前项目高亮（基座下发 project 键的 dsProjectCode 命中时）
+          const isCurrent =
+            hostCurrentProject.value &&
+            Number(hostCurrentProject.value.dsProjectCode) === Number(row.code)
+          const nameLink = h(
             ButtonLink,
             {
               onClick: () => {
@@ -108,6 +115,13 @@ export function useTable() {
                 )
             }
           )
+          return isCurrent
+            ? h(NSpace, { align: 'center' }, () => [
+                nameLink,
+                h(NTag, { type: 'success', size: 'small' }, () => '当前')
+              ])
+            : nameLink
+        }
       },
       {
         title: t('project.list.owned_users'),
@@ -248,7 +262,7 @@ export function useTable() {
   }
 
   const variables = reactive({
-    columns: [],
+    columns: [] as any[],
     tableWidth: DefaultTableWidth,
     tableData: [],
     page: ref(1),
@@ -260,6 +274,15 @@ export function useTable() {
     statusRef: ref(0),
     row: {},
     loadingRef: ref(false)
+  })
+
+  // 项目一体化：基座侧为唯一创建入口时，项目级写操作列（编辑/授权组/删除）整列隐藏
+  isProjectCreationEnabled().then((enabled) => {
+    if (enabled || !variables.columns.length) return
+    variables.columns = (variables.columns as any[]).filter(
+      (column) => column.key !== 'actions'
+    )
+    variables.tableWidth = calculateTableWidth(variables.columns)
   })
 
   const getTableData = (params: any) => {

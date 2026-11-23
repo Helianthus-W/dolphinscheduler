@@ -23,6 +23,7 @@ import static org.apache.dolphinscheduler.api.constants.ApiFuncIdentificationCon
 
 import org.apache.dolphinscheduler.api.enums.Status;
 import org.apache.dolphinscheduler.api.exceptions.ServiceException;
+import org.apache.dolphinscheduler.api.security.ProjectMutationGuard;
 import org.apache.dolphinscheduler.api.service.ProjectService;
 import org.apache.dolphinscheduler.api.service.TaskGroupService;
 import org.apache.dolphinscheduler.api.utils.PageInfo;
@@ -91,6 +92,9 @@ public class ProjectServiceImpl extends BaseServiceImpl implements ProjectServic
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private ProjectMutationGuard projectMutationGuard;
+
     /**
      * create project
      *
@@ -103,6 +107,11 @@ public class ProjectServiceImpl extends BaseServiceImpl implements ProjectServic
     @Transactional
     public Result createProject(User loginUser, String name, String desc) {
         Result result = new Result();
+
+        if (!projectMutationGuard.isMutationAllowed()) {
+            putMsg(result, Status.USER_NO_OPERATION_PERM);
+            return result;
+        }
 
         checkDesc(result, desc);
         if (result.getCode() != Status.SUCCESS.getCode()) {
@@ -461,6 +470,10 @@ public class ProjectServiceImpl extends BaseServiceImpl implements ProjectServic
     @Override
     public Result deleteProject(User loginUser, Long projectCode) {
         Result result = new Result();
+        if (!projectMutationGuard.isMutationAllowed()) {
+            putMsg(result, Status.USER_NO_OPERATION_PERM);
+            return result;
+        }
         Project project = projectMapper.queryByCode(projectCode);
 
         boolean hasProjectAndWritePerm = hasProjectAndWritePerm(loginUser, project, result);
@@ -527,6 +540,11 @@ public class ProjectServiceImpl extends BaseServiceImpl implements ProjectServic
     @Override
     public Result update(User loginUser, Long projectCode, String projectName, String desc) {
         Result result = new Result();
+
+        if (!projectMutationGuard.isMutationAllowed()) {
+            putMsg(result, Status.USER_NO_OPERATION_PERM);
+            return result;
+        }
 
         checkDesc(result, desc);
         if (result.getCode() != Status.SUCCESS.getCode()) {

@@ -34,7 +34,11 @@
 package org.apache.dolphinscheduler.api.permission;
 
 import static java.util.stream.Collectors.toSet;
+import static org.apache.dolphinscheduler.api.constants.ApiFuncIdentificationConstant.PROJECT_CREATE;
+import static org.apache.dolphinscheduler.api.constants.ApiFuncIdentificationConstant.PROJECT_DELETE;
+import static org.apache.dolphinscheduler.api.constants.ApiFuncIdentificationConstant.PROJECT_UPDATE;
 
+import org.apache.dolphinscheduler.api.security.ProjectMutationGuard;
 import org.apache.dolphinscheduler.common.enums.AuthorizationType;
 import org.apache.dolphinscheduler.common.enums.UserType;
 import org.apache.dolphinscheduler.dao.entity.AccessToken;
@@ -179,9 +183,11 @@ public class ResourcePermissionCheckServiceImpl
     public static class ProjectsResourcePermissionCheck implements ResourceAcquisitionAndPermissionCheck<Integer> {
 
         private final ProjectMapper projectMapper;
+        private final ProjectMutationGuard projectMutationGuard;
 
-        public ProjectsResourcePermissionCheck(ProjectMapper projectMapper) {
+        public ProjectsResourcePermissionCheck(ProjectMapper projectMapper, ProjectMutationGuard projectMutationGuard) {
             this.projectMapper = projectMapper;
+            this.projectMutationGuard = projectMutationGuard;
         }
 
         @Override
@@ -191,7 +197,13 @@ public class ResourcePermissionCheckServiceImpl
 
         @Override
         public boolean permissionCheck(int userId, String permissionKey, Logger logger) {
-            // all users can create projects
+            // project-level writes (create/edit/delete) are banned for direct
+            // callers when the base owns project creation; trusted
+            // server-to-server calls stay exempt (see ProjectMutationGuard)
+            if (PROJECT_CREATE.equals(permissionKey) || PROJECT_UPDATE.equals(permissionKey)
+                    || PROJECT_DELETE.equals(permissionKey)) {
+                return projectMutationGuard.isMutationAllowed();
+            }
             return true;
         }
 

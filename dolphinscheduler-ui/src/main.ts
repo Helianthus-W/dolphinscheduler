@@ -29,6 +29,8 @@ import './assets/styles/default.scss'
 import trim from './utils/trim'
 import { bindQiankun, firstBaseUser } from '@/qiankun/useQiankunState'
 import { installHostNavigation } from '@/qiankun/useHostNavigation'
+import { getAuthMode } from '@/qiankun/authMode'
+import { trustedLoginState } from '@/qiankun/trustedLoginState'
 
 let instance: VueApp | null = null
 let hostNavigationCleanup: (() => void) | null = null
@@ -64,6 +66,13 @@ async function mountWhenTrustedReady(
   container: Element | string,
   props: Record<string, any>
 ) {
+  const mode = await getAuthMode()
+  trustedLoginState.portalMode = mode === 'PORTAL'
+  if (trustedLoginState.portalMode) {
+    // 身份源=基座：认证由基座过滤器逐请求完成，子应用免换取、免 sessionId
+    instance?.mount(container)
+    return
+  }
   // getGlobalState may be absent on mount props; fall back to awaiting the
   // first global-state emission (bounded), so the exchange still precedes
   // the first render.

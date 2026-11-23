@@ -395,7 +395,9 @@
                 <groupId>mysql</groupId>
                 <artifactId>mysql-connector-java</artifactId>
                 <version>${mysql-connector.version}</version>
-                <scope>test</scope>
+                <!-- 本地集成改造：standalone 以 mysql profile 运行（application.yaml），驱动须进运行时类路径；
+                     上游为 test（GPL 许可规避），AGENTS.md 明确 MySQL 部署需改为 compile -->
+                <scope>compile</scope>
             </dependency>
 
             <dependency>

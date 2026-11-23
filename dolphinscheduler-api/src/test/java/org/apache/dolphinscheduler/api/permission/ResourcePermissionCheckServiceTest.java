@@ -18,6 +18,7 @@
 package org.apache.dolphinscheduler.api.permission;
 
 import org.apache.dolphinscheduler.api.constants.ApiFuncIdentificationConstant;
+import org.apache.dolphinscheduler.api.security.ProjectMutationGuard;
 import org.apache.dolphinscheduler.common.enums.AuthorizationType;
 import org.apache.dolphinscheduler.common.enums.UserType;
 import org.apache.dolphinscheduler.dao.entity.Project;
@@ -53,13 +54,19 @@ public class ResourcePermissionCheckServiceTest {
     @Mock
     private ProjectMapper projectMapper;
 
+    @Mock
+    private ProjectMutationGuard projectMutationGuard;
+
     @InjectMocks
     ResourcePermissionCheckServiceImpl resourcePermissionCheckService;
 
     @BeforeEach
     public void setup() {
+        // 默认放行项目写操作，保持上游语义（封禁逻辑有独立的守卫实现与集成验证）
+        Mockito.lenient().when(projectMutationGuard.isMutationAllowed()).thenReturn(true);
         ResourcePermissionCheckServiceImpl.RESOURCE_LIST_MAP.put(AuthorizationType.PROJECTS,
-                new ResourcePermissionCheckServiceImpl.ProjectsResourcePermissionCheck(projectMapper));
+                new ResourcePermissionCheckServiceImpl.ProjectsResourcePermissionCheck(projectMapper,
+                        projectMutationGuard));
     }
 
     @Test

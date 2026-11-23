@@ -70,12 +70,20 @@ export function bindQiankun(props: Record<string, any> = {}) {
         themeStore.setDarkThemeFlag(Number(value.theme) === 2)
       }
       // Unified auth (phase 2): silently exchange the host user for a DS session
-      if (value.user) {
+      // Unified auth (phase 2): silently exchange the host user for a DS
+      // session (not needed under the PORTAL identity source)
+      if (value.user && !trustedLoginState.portalMode) {
         resolveFirstBaseUser(value.user.name)
       }
-      if (value.user && value.user.name) {
+      if (value.user && value.user.name && !trustedLoginState.portalMode) {
         import('./useTrustedLogin')
           .then((m) => m.tryTrustedLogin(value.user.name))
+          .catch(() => {})
+      }
+      // Project integration (P2): follow the host's current project
+      if (value.project) {
+        import('./useHostProjectFollow')
+          .then((m) => m.applyHostProject(value.project))
           .catch(() => {})
       }
     }, true)
