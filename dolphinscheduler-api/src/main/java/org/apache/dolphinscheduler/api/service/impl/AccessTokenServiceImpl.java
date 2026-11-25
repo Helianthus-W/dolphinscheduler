@@ -167,17 +167,18 @@ public class AccessTokenServiceImpl extends BaseServiceImpl implements AccessTok
      */
     @Override
     public void deleteAccessTokenById(User loginUser, int id) {
-        if (!canOperatorPermissions(loginUser, null, AuthorizationType.ACCESS_TOKEN, ACCESS_TOKEN_DELETE)) {
-            throw new ServiceException(Status.USER_NO_OPERATION_PERM);
-        }
-
         AccessToken accessToken = accessTokenMapper.selectById(id);
         if (accessToken == null) {
             throw new ServiceException(Status.ACCESS_TOKEN_NOT_EXIST, id);
         }
 
-        // admin can operate all, non-admin can operate their own
-        if (accessToken.getUserId() != loginUser.getId() && !loginUser.getUserType().equals(UserType.ADMIN_USER)) {
+        // permission: operator with global permission, or the owner deleting
+        // their own token (same self-service fallback as createToken; upstream
+        // checked global permission first so non-admin owners were rejected
+        // before reaching the ownership check)
+        boolean selfOperate = accessToken.getUserId() == loginUser.getId();
+        if (!canOperatorPermissions(loginUser, null, AuthorizationType.ACCESS_TOKEN, ACCESS_TOKEN_DELETE)
+                && !selfOperate) {
             throw new ServiceException(Status.USER_NO_OPERATION_PERM);
         }
         accessTokenMapper.deleteById(id);
@@ -195,19 +196,20 @@ public class AccessTokenServiceImpl extends BaseServiceImpl implements AccessTok
     @Override
     public AccessToken updateToken(User loginUser, int id, int userId, String expireTime, String token) {
 
-        // 1. check permission
-        if (!canOperatorPermissions(loginUser, null, AuthorizationType.ACCESS_TOKEN, ACCESS_TOKEN_UPDATE)) {
-            throw new ServiceException(Status.USER_NO_OPERATION_PERM);
-        }
-
-        // 2. check if token is existed
+        // 1. check if token is existed
         AccessToken accessToken = accessTokenMapper.selectById(id);
         if (accessToken == null) {
             log.error("Access token does not exist, accessTokenId:{}.", id);
             throw new ServiceException(Status.ACCESS_TOKEN_NOT_EXIST, id);
         }
-        // admin can operate all, non-admin can operate their own
-        if (accessToken.getUserId() != loginUser.getId() && !loginUser.getUserType().equals(UserType.ADMIN_USER)) {
+        // permission: operator with global permission, or the owner operating
+        // their own token (aligned with createToken's self-service fallback;
+        // upstream checks global permission first and the ownership check
+        // below is unreachable for non-admin users)
+        boolean selfOperate = accessToken.getUserId() == loginUser.getId()
+                && userId == loginUser.getId();
+        if (!canOperatorPermissions(loginUser, null, AuthorizationType.ACCESS_TOKEN, ACCESS_TOKEN_UPDATE)
+                && !selfOperate) {
             throw new ServiceException(Status.USER_NO_OPERATION_PERM);
         }
 
