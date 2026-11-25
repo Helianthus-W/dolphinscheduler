@@ -1,0 +1,293 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# ============================================================================
+# DolphinScheduler api-server 配置（基座集成版，用于集群部署）
+# 基底：dolphinscheduler-api/src/main/resources/application.yaml（3.2.2）
+# 相对原版的改动：
+#   1. 默认 profile 改为 mysql
+#   2. registry 指向外部 ZK（集群必须）
+#   3. security 段改为 PORTAL 身份源（基座统一鉴权）+ 项目写操作封禁
+# 用法：构建集群包后替换 api-server/conf/application.yaml，
+#       或改源码 dolphinscheduler-api/src/main/resources/application.yaml 后构建。
+# 所有需要按环境修改的值都带 [CUSTOMIZE] 注释。
+# ============================================================================
+
+server:
+  port: 12345
+  servlet:
+    session:
+      timeout: 120m
+    context-path: /dolphinscheduler/
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,application/xml
+  jetty:
+    max-http-form-post-size: 5000000
+    accesslog:
+      enabled: true
+      custom-format: '%{client}a - %u %t "%r" %s %O %{ms}Tms'
+
+spring:
+  profiles:
+    # [CUSTOMIZE] 默认 postgresql，本集成使用 mysql（下方 on-profile: mysql 段的数据源也要配）
+    active: mysql
+  banner:
+    charset: UTF-8
+  jackson:
+    time-zone: UTC
+    date-format: "yyyy-MM-dd HH:mm:ss"
+  servlet:
+    multipart:
+      max-file-size: 1024MB
+      max-request-size: 1024MB
+  messages:
+    basename: i18n/messages
+  datasource:
+    # [CUSTOMIZE] 默认 profile（此处仅为占位兜底，实际由下方 on-profile: mysql 段覆盖）
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://127.0.0.1:5432/dolphinscheduler
+    username: root
+    password: root
+    hikari:
+      connection-test-query: select 1
+      pool-name: DolphinScheduler
+  quartz:
+    auto-startup: false
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never
+    properties:
+      org.quartz.jobStore.isClustered: true
+      org.quartz.jobStore.class: org.springframework.scheduling.quartz.LocalDataSourceJobStore
+      org.quartz.scheduler.instanceId: AUTO
+      org.quartz.jobStore.tablePrefix: QRTZ_
+      org.quartz.jobStore.acquireTriggersWithinLock: true
+      org.quartz.scheduler.instanceName: DolphinScheduler
+      org.quartz.threadPool.class: org.apache.dolphinscheduler.scheduler.quartz.QuartzZeroSizeThreadPool
+      org.quartz.jobStore.useProperties: false
+      org.quartz.jobStore.misfireThreshold: 60000
+      org.quartz.scheduler.makeSchedulerThreadDaemon: true
+      org.quartz.jobStore.driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+      org.quartz.jobStore.clusterCheckinInterval: 5000
+      org.quartz.scheduler.batchTriggerAcquisitionMaxCount: 1
+  mvc:
+    pathmatch:
+      matching-strategy: ANT_PATH_MATCHER
+    static-path-pattern: /static/**
+  cloud.discovery.client.composite-indicator.enabled: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  packages-to-scan: org.apache.dolphinscheduler.api
+
+# Mybatis-plus configuration, you don't need to change it
+mybatis-plus:
+  mapper-locations: classpath:org/apache/dolphinscheduler/dao/mapper/*Mapper.xml
+  type-aliases-package: org.apache.dolphinscheduler.dao.entity
+  configuration:
+    cache-enabled: false
+    call-setters-on-nulls: true
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: NULL
+  global-config:
+    db-config:
+      id-type: auto
+    banner: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      enabled: true
+      show-details: always
+  health:
+    db:
+      enabled: true
+    defaults:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+registry:
+  # [CUSTOMIZE] 集群模式必须指向外部 ZooKeeper（standalone 的内嵌 ZK 不存在于此配置）
+  type: zookeeper
+  zookeeper:
+    namespace: dolphinscheduler
+    # [CUSTOMIZE] 测试环境 ZK 地址；多 ZK 用逗号分隔
+    connect-string: 10.200.8.134:2181
+    retry-policy:
+      base-sleep-time: 60ms
+      max-sleep: 300ms
+      max-retries: 5
+    session-timeout: 60s
+    connection-timeout: 15s
+    block-until-connected: 15s
+    digest: ~
+
+api:
+  audit-enable: false
+  # Traffic control, if you turn on this config, the maximum number of request/s will be limited.
+  # global max request number per second
+  # default tenant-level max request number
+  traffic-control:
+      global-switch: false
+      max-global-qps-rate: 300
+      tenant-switch: false
+      default-tenant-qps-rate: 10
+        #customize-tenant-qps-rate:
+        # eg.
+      #tenant1: 11
+      #tenant2: 20
+  python-gateway:
+    # Weather enable python gateway server or not. The default value is false.
+    enabled: false
+    # Authentication token for connection from python api to python gateway server. Should be changed the default value
+    # when you deploy in public network.
+    auth-token: jwUDzpLsNKEFER4*a8gruBH_GsAurNxU7A@Xc
+    # The address of Python gateway server start. Set its value to `0.0.0.0` if your Python API run in different
+    # between Python gateway server. It could be be specific to other address like `127.0.0.1` or `localhost`
+    gateway-server-address: 0.0.0.0
+    # The port of Python gateway server start. Define which port you could connect to Python gateway server from
+    # Python API side.
+    gateway-server-port: 25333
+    # The address of Python callback client.
+    python-address: 127.0.0.1
+    # The port of Python callback client.
+    python-port: 25334
+    # Close connection of socket server if no other request accept after x milliseconds. Define value is (0 = infinite),
+    # and socket server would never close even though no requests accept
+    connect-timeout: 0
+    # Close each active connection of socket server if python program not active after x milliseconds. Define value is
+    # (0 = infinite), and socket server would never close even though no requests accept
+    read-timeout: 0
+
+metrics:
+  enabled: true
+
+security:
+  # 项目级写操作封禁（项目一体化 P1）：false=仅服务通道（合法 X-Trusted-Client 密钥）可
+  # 创建/编辑/删除项目，浏览器直连一律封禁；true/缺省=放开。生产保持 false。
+  project-creation:
+    enabled: false
+  authentication:
+    # Authentication types (supported types: PASSWORD,LDAP,CASDOOR_SSO,TRUSTED,PORTAL)
+    # PORTAL：身份源=基座门户，废弃 DS 自有会话认证（统一鉴权/项目一体化，见 基座对接操作手册.md）
+    type: PORTAL
+    # IF you set type `LDAP`, below config will be effective
+    ldap:
+      # ldap server config
+      urls: ldap://ldap.forumsys.com:389/
+      base-dn: dc=example,dc=com
+      username: cn=read-only-admin,dc=example,dc=com
+      password: password
+      user:
+        # admin userId when you use LDAP login
+        admin: read-only-admin
+        identity-attribute: uid
+        email-attribute: mail
+        # action when ldap user is not exist (supported types: CREATE,DENY)
+        not-exist-action: CREATE
+      ssl:
+        enable: false
+        # jks file absolute path && password
+        trust-store: "/ldapkeystore.jks"
+        trust-store-password: "password"
+    casdoor:
+      user:
+        admin: ""
+    oauth2:
+      enable: false
+      provider:
+        github:
+          authorizationUri: ""
+          redirectUri: ""
+          clientId: ""
+          clientSecret: ""
+          tokenUri: ""
+          userInfoUri: ""
+          callbackUrl: ""
+          iconUri: ""
+          provider: github
+        google:
+          authorizationUri: ""
+          redirectUri: ""
+          clientId: ""
+          clientSecret: ""
+          tokenUri: ""
+          userInfoUri: ""
+          callbackUrl: ""
+          iconUri: ""
+          provider: google
+    # [CUSTOMIZE] 可信服务通道（X-Portal-User + 本密钥）；必须与 dlite-base 的 ds.sync.shared-secret 一致
+    trusted:
+      # 可信网关登录（POST /login/trusted）：仅在网关注入 X-Trusted-Client 头的部署中开启，
+      # PORTAL 模式下本端点不再被前端调用（服务断言直接走 X-Portal-User 头），保留作兼容回退
+      enable: true
+      # [CUSTOMIZE] 生产环境必须换成随机强密钥，并同步给 dlite-base 配置
+      shared-secret: "ds-dev-trusted-secret"
+    # PORTAL 身份源：浏览器路径经门户校验会话 cookie（dlite_login_token），短 TTL 缓存，fail-closed
+    portal:
+      # [CUSTOMIZE] 门户校验地址（内网直连 dlite-portal，不要走 80 端口 nginx）
+      validate-url: "http://10.200.8.134:18888/dlite-portal/oauth/token/getUser"
+      cookie-name: dlite_login_token
+      alternate-cookie-name: lvfa_token
+      cache-ttl-seconds: 30
+      connect-timeout-ms: 3000
+      read-timeout-ms: 5000
+      # [CUSTOMIZE] 临时通道：逗号分隔的门户用户名白名单，名单内影子用户在 DS 为 ADMIN
+      # （角色对齐期使用；正式方案是基座安全中心统一管控，收敛后清空此值）
+      admin-users: "xiaowang"
+
+casdoor:
+  # Your Casdoor server url
+  endpoint: ""
+  client-id: ""
+  client-secret: ""
+  # The certificate may be multi-line, you can use `|-` for ease
+  certificate: ""
+  # Your organization name added in Casdoor
+  organization-name: ""
+  # Your application name added in Casdoor
+  application-name: ""
+  # Doplhinscheduler login url
+  redirect-url: ""
+
+
+# Override by profile
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # [CUSTOMIZE] 测试环境 MySQL 的 dolphinscheduler 库（须先导入 dolphinscheduler_mysql.sql）
+    url: jdbc:mysql://10.200.8.134:3306/dolphinscheduler?useUnicode=true&characterEncoding=UTF-8
+    # [CUSTOMIZE]
+    username: dlite
+    # [CUSTOMIZE]
+    password: DLite@123456
+  quartz:
+    properties:
+      org.quartz.jobStore.driverDelegateClass: org.quartz.impl.jdbcjobstore.StdJDBCDelegate

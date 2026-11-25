@@ -1,0 +1,202 @@
+gzip on; # 开启gzip压缩
+gzip_min_length 1024; # 设置最小压缩的页面大小，页面字节大于此大小会被压缩
+gzip_types text/plain application/javascript application/x-javascript text/javascript text/xml text/css; # 对这些类型的响应进行压缩
+
+client_max_body_size 1000m;
+
+# 全局配置
+proxy_set_header Connection "";
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Host $server_name;
+proxy_set_header Host $host;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name _;
+#    add_header 'Access-Control-Allow-Origin' '*';
+    # 前端静态资源
+    location / {
+        root /usr/share/nginx/html/web/main;
+        try_files $uri $uri/ /index.html;
+        charset utf-8,gbk;
+    }
+
+    # 通用资源路径
+    location ~ ^/(security|conf|system|access|plat|assets|metadata|di|templates|)/ {
+        root /usr/share/nginx/html/web;
+        try_files $uri $uri/ /index.html;
+        charset utf-8,gbk;
+    }
+
+    # API 服务
+    location /apiis/ {
+        index index.html;
+        root /usr/share/nginx/html/apiis; #前台前端部署地址
+        try_files $uri $uri/ /apiis/index.html;
+        charset utf-8,gbk;
+    }
+
+    location = /open {
+        return 301 /open/;
+    }
+
+    location  ~ ^/open/ {
+         index index.html;
+         root /usr/share/nginx/html/apiis; #前台前端部署地址
+         try_files $uri $uri/ /open/index.html;
+         charset utf-8,gbk;
+    }
+
+    # APIIS 管理服务
+    location /apiis-manage {
+        proxy_http_version 1.1;
+        proxy_connect_timeout 1;
+        proxy_send_timeout 30;
+        proxy_read_timeout 60;
+        proxy_pass http://dlite-apiis/apiis-manage;
+    }
+
+    location /apiis-gateway {
+        proxy_http_version 1.1;
+        proxy_connect_timeout 1;
+        proxy_send_timeout 30;
+        proxy_read_timeout 60;
+        proxy_pass http://dlite-gateway/apiis-gateway;
+    }
+
+    location /apiis-platform {
+        proxy_http_version 1.1;
+        proxy_connect_timeout 1;
+        proxy_send_timeout 30;
+        proxy_read_timeout 60;
+        proxy_pass http://dlite-open/apiis-platform;
+    }
+
+    location /api {
+        proxy_http_version 1.1;
+        proxy_connect_timeout 1;
+        proxy_send_timeout 30;
+        proxy_read_timeout 60;
+        proxy_pass http://dlite-zuul/api;
+    }
+
+    location /api-external {
+        proxy_http_version 1.1;
+        proxy_connect_timeout 1;
+        proxy_send_timeout 30;
+        proxy_read_timeout 60;
+        proxy_pass http://dlite-zuul/api-external;
+    }
+
+    location /discovery {
+        proxy_pass http://10.200.8.134:8761/;
+    }
+
+    # 主数据 MDM 后端：宿主机 java -jar（端口 8090）
+    # 注意 dlite-web 是 Docker 容器，容器内的 127.0.0.1 是容器本身，
+    # 必须写宿主机可达地址；/lvmai-mdm/api/** 剥掉 /lvmai-mdm 前缀后转发
+    location /lvmai-mdm/api/ {
+        proxy_http_version 1.1;
+        proxy_connect_timeout 1;
+        proxy_send_timeout 30;
+        proxy_read_timeout 300;    # Excel 导入/批量接口耗时较长
+        proxy_pass http://10.200.8.134:8090/api/;
+    }
+
+    # 主数据 MDM 前端（构建 base=/lvmai-mdm/）
+    # root 必须是容器内路径：宿主机 /opt/datalite/nginx/html => 容器 /usr/share/nginx/html
+    location /lvmai-mdm/ {
+        root /usr/share/nginx/html/web;
+        index index.html;
+        try_files $uri $uri/ /lvmai-mdm/index.html;
+        charset utf-8;
+    }
+
+    # ===== 数据开发（DolphinScheduler）集成：新增 start =====
+    # DS UI 构建产物（base=/dolphinscheduler/ui/），部署到 web/dolphinscheduler/ui/
+    # 注意：不要把 dolphinscheduler 加进上方通用资源正则，正则 location 会抢走 API 请求
+    location /dolphinscheduler/ui/ {
+        root /usr/share/nginx/html/web;
+        index index.html;
+        try_files $uri $uri/ /dolphinscheduler/ui/index.html;
+        charset utf-8;
+    }
+
+    # DS 后端 API 代理（与本地 webpack dev 代理的 bypass 规则等价）
+    # 整页刷新/导航（Accept: text/html）回基座 SPA 由 qiankun 接管路由；
+    # 其余（子应用 XHR: application/json / */*）代理到 DS 后端
+    location /dolphinscheduler/ {
+        if ($http_accept ~* "text/html") {
+            rewrite ^.*$ /index.html last;
+        }
+        proxy_http_version 1.1;
+        proxy_connect_timeout 1;
+        proxy_send_timeout 30;
+        proxy_read_timeout 60;
+        proxy_pass http://dlite-ds;
+    }
+    # ===== 数据开发（DolphinScheduler）集成：新增 end =====
+
+    # 其他服务
+    location /dlite-portal {
+       # add_header Access-Control-Allow-Origin 'http://*.aijuzhao.com';
+        proxy_pass http://10.200.8.134:18888;
+    }
+
+    location  /dlite-base {
+        proxy_pass http://10.200.8.134:15890;
+    }
+    location  /dlite-resource {
+        proxy_pass http://10.200.8.134:28880;
+    }
+    location  /dlite-governance {
+        proxy_pass http://10.200.8.134:18890;
+    }
+    location  /dlite-flow {
+        proxy_pass http://10.200.8.134:16890;
+    }
+    location  /dlite-assets {
+        proxy_pass http://10.200.8.134:18880;
+    }
+
+    # 错误页面
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+    }
+
+    # 安全配置
+    location ~ /\.ht {
+        deny all;
+    }
+}
+
+# 上游服务配置
+upstream dlite-apiis {
+    ip_hash;
+    server 10.200.8.135:8083;
+}
+
+upstream dlite-gateway {
+    ip_hash;
+    server 10.200.8.135:8990;
+}
+
+upstream dlite-open {
+    ip_hash;
+    server 10.200.8.135:8098;
+}
+
+upstream dlite-zuul {
+    ip_hash;
+    server 10.200.8.135:8888;
+}
+
+# ===== 数据开发（DolphinScheduler）集成：新增 upstream =====
+# DS 后端部署地址：测试环境实际为 10.200.8.211:12345（2026-11-25 确认；
+# standalone 默认也是 12345）。上游不可达时 location /dolphinscheduler/ 的表现是 502。
+upstream dlite-ds {
+    ip_hash;
+    server 10.200.8.211:12345;
+}

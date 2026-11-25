@@ -46,6 +46,8 @@ export function tryTrustedLogin(baseUserName?: string): Promise<void> {
 let inFlightExchange: Promise<void> | null = null
 
 async function doTryTrustedLogin(baseUserName?: string) {
+  // PORTAL 身份源下认证由基座逐请求完成，trusted 交换不适用；防御订阅期竞态
+  if (trustedLoginState.portalMode) return
   if (!trustedLoginState.enabled || trustedLoginState.succeeded) return
   if (!qiankunWindow.__POWERED_BY_QIANKUN__ || !baseUserName) return
   const userStore = useUserStore()
@@ -80,6 +82,15 @@ async function doTryTrustedLogin(baseUserName?: string) {
     // the DS login page handles the fallback.
   } finally {
     trustedLoginState.attempting = false
+    if (
+      trustedLoginState.portalMode &&
+      !useUserStore().getSessionId &&
+      router.currentRoute.value !== START_LOCATION &&
+      router.currentRoute.value.path !== '/login'
+    ) {
+      // PORTAL 模式下没有 DS sessionId 属正常（认证走门户 cookie），不得因此跳登录页
+      return
+    }
     if (
       !useUserStore().getSessionId &&
       router.currentRoute.value !== START_LOCATION &&

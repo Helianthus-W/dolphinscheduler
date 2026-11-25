@@ -1,0 +1,50 @@
+server.servlet.context-path=/dlite-base
+server.port=15890
+#server.port=9080
+spring.cloud.config.uri=http://127.0.0.1:15890
+spring.application.name=dlite-base
+eureka.instance.prefer-ip-address=true
+eureka.instance.ip-address=${SPRING_CLOUD_CLIENT_IP_ADDRESS:${spring.cloud.client.ip-address}}
+eureka.instance.instance-id=${spring.application.name}:${eureka.instance.ip-address}:${server.port}
+filter.exculdUrls=/config,/project/getProjectCodeByName,/feign/permission,/druid
+filter.log.excludeUrls=/druid
+spring.messages.basename=language/messages
+spring.messages.use-code-as-default-message=true
+spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+spring.main.allow-bean-definition-overriding=true
+#\u662F\u5426\u9700\u8981\u8BE9\u914D\u7F6E\u6587\u4EF6\uFF0C\u63D0\u4F9B\u7ED9\u751F\u6210\u914D\u7F6E\u6587\u4EF6\u7684\u5DE5\u5177\u8BFB\u53D6
+hdfs.enable=true
+hbase.enable=true
+hive.enable=true
+#\u5F00\u53D1\u73AF\u5883\u5F00\u542Fswagger
+swagger.enable=false
+#\u5F00\u542Fmybatis\u6253\u5370sql
+logging.level.com.dlite.web=debug
+management.server.port=-1
+spring.jmx.default-domain=dlite-base
+
+# \u8BBE\u7F6E\u6587\u4EF6\u4E0A\u4F20\u5927\u5C0F
+spring.servlet.multipart.maxFileSize=256MB
+spring.servlet.multipart.maxRequestSize=256MB
+# project path
+project.path=/opt/datalite/tomcat/webapps_dlite-base/dlite-base
+
+# ============================================================================
+# [project-integration] DS 项目创建同步（dlite-base -> DolphinScheduler）
+# 说明见《基座对接操作手册.md》§3.2；[CUSTOMIZE] 处按测试环境修改
+# ============================================================================
+# 同步总开关：false=基座建项目完全不影响 DS（也不产生登记数据）
+ds.sync.enabled=true
+# [CUSTOMIZE] DS api-server 地址（与 nginx upstream dlite-ds 指向一致）
+ds.sync.endpoint=http://10.200.8.211:12345/dolphinscheduler
+# [CUSTOMIZE] 与 DS security.authentication.trusted.shared-secret 严格一致
+ds.sync.shared-secret=ds-dev-trusted-secret
+# [CUSTOMIZE] 管家账号（门户用户名，用于成员授权/撤销；须映射为 DS admin，建议 DS 内置管理员 admin）
+ds.sync.housekeeper-user=admin
+# 存量回填开关：首次部署置 true（把已存在的基座项目补同步到 DS），跑完一次后可改回 false
+ds.sync.backfill-enabled=true
+# 失败重试周期（毫秒），默认 5 分钟，一般不用改
+#ds.sync.retry-delay-ms=300000
+# DS 调用超时（毫秒），一般不用改
+#ds.sync.connect-timeout-ms=3000
+#ds.sync.read-timeout-ms=5000
